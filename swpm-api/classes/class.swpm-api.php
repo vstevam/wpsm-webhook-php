@@ -97,10 +97,19 @@ class SwpmAPI extends SwpmRegistration {
 	    }
 
 	    if ( ! isset( $member[ 'membership_level' ] ) ) {
-		if ( $settings->get_value( 'enable-free-membership' ) ) {
-		    $member[ 'membership_level' ] = $settings->get_value( 'free-membership-id' );
+		    $member[ 'membership_level' ] = 4;
 		}
-	    }
+		
+		if ( ! isset( $member[ 'subscr_id' ] ) ) {
+			if ( $settings->get_value( 'hotkey' ) ) {
+				$member[ 'subscr_id' ] = $settings->get_value( 'hotkey' );
+			}
+		}
+		
+
+		if ( ! isset( $member[ 'subscriptisubscription_startson_starts' ] ) ) {
+		    $member[ 'subscription_starts' ] = date( 'Y-m-d' );
+		}
 
 	    if ( ! isset( $member[ 'reg_code' ] ) ) {
 		$md5_code		 = md5( uniqid() );
@@ -117,7 +126,7 @@ class SwpmAPI extends SwpmRegistration {
             //Insert the member record into SWPM members table
 	    $res = $wpdb->insert( $wpdb->prefix . "swpm_members_tbl", $member );
             SwpmLog::log_simple_debug('SWPM API addon: executed the member data insert db query.', true);
-
+                    
 	    if ( ! $res ) {
 		//DB error occured
                 SwpmLog::log_simple_debug('SWPM API addon: Insert db query failed.', false);
@@ -149,10 +158,11 @@ class SwpmAPI extends SwpmRegistration {
 		//Check if we need to send notification email
 		//if send_email parameter is present, we use it to determinte should we send it or not
 		//if it's not present, we're using gloabal setting 'enable-notification-after-manual-user-add'
-		if ( (isset( $_POST[ 'send_email' ] ) && $_POST[ 'send_email' ]) ) {
+		if ( (isset( $_POST[ 'send_email' ] ) && $_POST[ 'send_email' ]) ||
+		( ! isset( $_POST[ 'send_email' ] ) && $settings->get_value( 'enable-notification-after-manual-user-add' ) ) ) {
 		    $member[ 'plain_password' ]	 = $plain_pass;
 		    $this->member_info		 = $member;
-
+                    
                     SwpmLog::log_simple_debug('SWPM API addon: Calling the send_reg_email() function to handle the email sending after full rego complete.', true);
 		    $this->send_reg_email();//Send the "registration successful and complete" email.
 		    unset( $member[ 'plain_password' ] );
@@ -161,7 +171,8 @@ class SwpmAPI extends SwpmRegistration {
                 /* NEW USER prompt to complete rego scenario */
 		//We need to send "Complete your registration" email to user
 		//But first we need to check if we're not disallowed to send emails
-		if ( (isset( $_POST[ 'send_email' ] ) && $_POST[ 'send_email' ]) ) {
+		if ( (isset( $_POST[ 'send_email' ] ) && $_POST[ 'send_email' ]) ||
+		( ! isset( $_POST[ 'send_email' ] ) && $settings->get_value( 'enable-notification-after-manual-user-add' ) ) ) {
 		    $separator	 = '?';
 		    $url		 = $settings->get_value( 'registration-page-url' );
 		    if ( strpos( $url, '?' ) !== false ) {
@@ -307,6 +318,26 @@ class SwpmAPI extends SwpmRegistration {
 	    $reply[ 'member' ]	 = $updated_member;
 
 	    post_reply( $reply );
+	}
+
+	if( $action === 'delete' ){
+		$email =  $_REQUEST[ 'userEmail' ];
+		$wp_user = SwpmMemberUtils::get_user_by_email( $email );
+		$user_id = $wp_user->member_id;
+
+		if ( empty( $user_id ) ) {
+			$reply[ 'message' ]	 = 'Member not found';
+			post_reply( $reply, false );
+			return;
+		}
+		$user_name = $wp_user->user_name;
+		wp_clear_auth_cookie();
+
+		SwpmMembers::delete_swpm_user_by_id( $user_id );
+		SwpmMembers::delete_wp_user( $user_name );
+
+		$reply[ 'message' ]	 = 'Member deleted successfully';
+		post_reply( $reply );
 	}
 
 	if ( $action === 'query' ) {
