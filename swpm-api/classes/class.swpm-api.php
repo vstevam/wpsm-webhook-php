@@ -321,12 +321,16 @@ class SwpmAPI extends SwpmRegistration {
 	}
 
 	if( $action === 'delete' ){
-		$email =  $_REQUEST[ 'userEmail' ];
+		//converts request body into JSON array
+		$inputJSON = file_get_contents('php://input');
+		$input = json_decode($inputJSON, TRUE);
+		
+		$email =  $input[ 'userEmail' ];
 		$wp_user = SwpmMemberUtils::get_user_by_email( $email );
 		$user_id = $wp_user->member_id;
 
 		if ( empty( $user_id ) ) {
-			$reply[ 'message' ]	 = 'Member not found';
+			$reply[ 'message' ]	 = 'Member not found ' ;
 			post_reply( $reply, false );
 			return;
 		}
